@@ -41,7 +41,6 @@ export default function VideoMeetComponent() {
 
     const socketRef = useRef(null);
     const socketIdRef = useRef(null);
-    // ... (all other refs and state are unchanged)
     const connectionsRef = useRef({});
     const videoMapRef = useRef({});
     const localVideoRef = useRef(null);
@@ -208,7 +207,9 @@ export default function VideoMeetComponent() {
         socketRef.current.on("connect", () => {
             socketIdRef.current = socketRef.current.id;
             // 7. Use the roomId from state
-            socketRef.current.emit("join-call", `/${roomId}`);
+            // NOTE: Your socketManager expects the full path,
+            // so we keep sending window.location.href
+            socketRef.current.emit("join-call", window.location.href);
         });
 
         // ... (all other socket listeners are unchanged)
@@ -770,12 +771,12 @@ export default function VideoMeetComponent() {
             ) : (
                 // --- FULL CALL UI (Unchanged) ---
                 <div className={styles.meetVideoContainer}>
-                    {/* ... (all your existing call UI) ... */}
                     <div
                         style={{
                             display: "flex",
                             width: "100%",
-                            height: "100%",
+                            flex: 1,
+                            overflow: "hidden",
                         }}
                     >
                         {showChat && (
