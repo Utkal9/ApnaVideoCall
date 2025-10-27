@@ -1,5 +1,4 @@
 import "./App.css";
-// 1. Import Navigate and Outlet
 import {
     Route,
     BrowserRouter as Router,
@@ -13,13 +12,11 @@ import { AuthProvider } from "./contexts/AuthContext";
 import VideoMeetComponent from "./pages/VideoMeet";
 import History from "./pages/history";
 import ProtectedRoute from "./pages/ProtectedRoute";
-import { checkAuth } from "./auth"; // 2. Import checkAuth
+import { checkAuth } from "./auth";
 
-// 3. --- CREATE A PUBLIC ROUTE COMPONENT ---
-// This prevents logged-in users from seeing the /auth page
+// This component prevents logged-in users from seeing the /auth page
 const PublicRoute = () => {
     const isAuthenticated = checkAuth();
-    // If logged in, redirect to home. Otherwise, show the auth page.
     return isAuthenticated ? <Navigate to="/" replace /> : <Outlet />;
 };
 
@@ -32,19 +29,19 @@ function App() {
                         {/* --- PUBLIC ROUTES --- */}
                         <Route path="/" element={<LandingPage />} />
 
-                        {/* 4. Wrap /auth in the new PublicRoute */}
                         <Route element={<PublicRoute />}>
                             <Route path="/auth" element={<Authentication />} />
                         </Route>
 
+                        {/* --- NEW: 'url' IS NOW A PUBLIC ROUTE --- */}
+                        {/* Guests and Logged-in users can access this. */}
+                        {/* The component itself will handle auth. */}
+                        <Route path="/:url" element={<VideoMeetComponent />} />
+
                         {/* --- PROTECTED ROUTES --- */}
-                        {/* Your existing ProtectedRoute wrapper is perfect */}
+                        {/* Only logged-in users can see these. */}
                         <Route element={<ProtectedRoute />}>
                             <Route path="/history" element={<History />} />
-                            <Route
-                                path="/:url"
-                                element={<VideoMeetComponent />}
-                            />
                         </Route>
                     </Routes>
                 </AuthProvider>

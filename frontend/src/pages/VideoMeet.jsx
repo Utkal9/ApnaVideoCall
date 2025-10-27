@@ -1,6 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, {
+    useEffect,
+    useRef,
+    useState,
+    useCallback,
+    useContext, // 1. Import useContext
+} from "react";
 import io from "socket.io-client";
-// 1. UPDATED: Added Paper, Typography, and Box for the new lobby
 import {
     Badge,
     IconButton,
@@ -18,8 +23,10 @@ import MicOffIcon from "@mui/icons-material/MicOff";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
 import ChatIcon from "@mui/icons-material/Chat";
-import styles from "../styles/videoComponent.module.css"; // Assuming this path is correct
+import styles from "../styles/videoComponent.module.css";
 import server from "../environment";
+import { AuthContext } from "../contexts/AuthContext"; // 2. Import AuthContext
+import { checkAuth } from "../auth"; // 3. Import checkAuth
 
 const server_url = server;
 
@@ -28,11 +35,16 @@ const peerConfigConnections = {
 };
 
 export default function VideoMeetComponent() {
+    // 4. Get AuthContext and check auth status
+    const { addToUserHistory } = useContext(AuthContext);
+    const isAuthenticated = checkAuth();
+
     const socketRef = useRef(null);
     const socketIdRef = useRef(null);
+    // ... (all other refs and state are unchanged)
     const connectionsRef = useRef({});
     const videoMapRef = useRef({});
-    const localVideoRef = useRef(null); // Ref for the local video element
+    const localVideoRef = useRef(null);
     const previewRef = useRef(null);
     const chatScrollRef = useRef(null);
 
@@ -46,6 +58,7 @@ export default function VideoMeetComponent() {
 
     const [askForUsername, setAskForUsername] = useState(true);
     const [username, setUsername] = useState("");
+    const [roomId, setRoomId] = useState(""); // 5. Add state for Room ID
 
     const [videos, setVideos] = useState([]);
 
@@ -55,7 +68,12 @@ export default function VideoMeetComponent() {
     const [showChat, setShowChat] = useState(true);
 
     useEffect(() => {
+        // 6. Get Room ID from URL
+        const id = window.location.pathname.replace("/", "");
+        setRoomId(id);
+
         (async () => {
+            // ... (media permission logic is unchanged)
             try {
                 let hasVideo = true;
                 try {
@@ -88,7 +106,6 @@ export default function VideoMeetComponent() {
                         if (previewRef.current) {
                             previewRef.current.srcObject = s;
                         }
-                        // We will set localVideoRef.current.srcObject in getMediaAndConnect
                     } catch (e) {
                         console.warn("Could not get user media initially:", e);
                         window.localStream = createBlackSilence();
@@ -106,6 +123,7 @@ export default function VideoMeetComponent() {
         })();
     }, []);
 
+    // ... (createBlackSilence function is unchanged)
     const createBlackSilence = () => {
         try {
             const ctx = new AudioContext();
@@ -135,9 +153,9 @@ export default function VideoMeetComponent() {
         }
     };
 
+    // ... (getMediaAndConnect function is unchanged)
     const getMediaAndConnect = async () => {
         try {
-            // 1. Determine if we *can* get video/audio, based on device availability.
             const hasVideoDevice =
                 typeof videoAvailable === "boolean" ? videoAvailable : true;
             const hasAudioDevice =
@@ -145,27 +163,22 @@ export default function VideoMeetComponent() {
 
             if (hasVideoDevice || hasAudioDevice) {
                 try {
-                    // 2. Request *all available* tracks, regardless of enabled state.
                     const s = await navigator.mediaDevices.getUserMedia({
                         video: hasVideoDevice,
                         audio: hasAudioDevice,
                     });
-
-                    // 3. Immediately set the enabled state based on user's lobby choice.
                     s.getVideoTracks().forEach(
                         (t) => (t.enabled = videoEnabled)
                     );
                     s.getAudioTracks().forEach(
                         (t) => (t.enabled = audioEnabled)
                     );
-
                     window.localStream = s;
                     if (localVideoRef.current)
                         localVideoRef.current.srcObject = s;
                 } catch (e) {
                     console.warn("getUserMedia failed at connect:", e);
                     window.localStream = createBlackSilence();
-                    // Ensure black stream also respects enabled state
                     window.localStream
                         .getVideoTracks()
                         .forEach((t) => (t.enabled = videoEnabled));
@@ -177,7 +190,6 @@ export default function VideoMeetComponent() {
                         localVideoRef.current.srcObject = window.localStream;
                 }
             } else {
-                // No devices at all
                 window.localStream = createBlackSilence();
                 if (localVideoRef.current)
                     localVideoRef.current.srcObject = window.localStream;
@@ -195,16 +207,13 @@ export default function VideoMeetComponent() {
 
         socketRef.current.on("connect", () => {
             socketIdRef.current = socketRef.current.id;
-            socketRef.current.emit("join-call", window.location.href);
+            // 7. Use the roomId from state
+            socketRef.current.emit("join-call", `/${roomId}`);
         });
 
+        // ... (all other socket listeners are unchanged)
         socketRef.current.on("signal", gotMessageFromServer);
-
         socketRef.current.on("chat-message", (data, sender, socketIdSender) => {
-            // =================================================================
-            // FIX: Only add message to state if it's from another user
-            // The sender's message is already added locally in sendMessage
-            // =================================================================
             if (socketIdSender !== socketIdRef.current) {
                 setMessages((prev) => [
                     ...prev,
@@ -213,11 +222,9 @@ export default function VideoMeetComponent() {
                 setNewMessages((n) => n + 1);
             }
         });
-
         socketRef.current.on("mute-status", (socketId, isMuted) => {
             console.log("peer mute status", socketId, isMuted);
         });
-
         socketRef.current.on("user-left", (id) => {
             setVideos((prev) => prev.filter((v) => v.socketId !== id));
             if (connectionsRef.current[id]) {
@@ -228,13 +235,11 @@ export default function VideoMeetComponent() {
             }
             delete videoMapRef.current[id];
         });
-
         socketRef.current.on("user-joined", (id, clients) => {
             clients.forEach((clientId) => {
                 if (clientId === socketIdRef.current) return;
                 if (!connectionsRef.current[clientId]) {
                     const pc = new RTCPeerConnection(peerConfigConnections);
-
                     pc.onicecandidate = (event) => {
                         if (event.candidate) {
                             socketRef.current.emit(
@@ -244,13 +249,11 @@ export default function VideoMeetComponent() {
                             );
                         }
                     };
-
                     pc.ontrack = (ev) => {
                         const stream =
                             ev.streams && ev.streams[0] ? ev.streams[0] : null;
                         if (!stream) return;
                         videoMapRef.current[clientId] = stream;
-
                         setVideos((prev) => {
                             const found = prev.find(
                                 (p) => p.socketId === clientId
@@ -272,7 +275,6 @@ export default function VideoMeetComponent() {
                             }
                         });
                     };
-
                     const localStream =
                         window.localStream || createBlackSilence();
                     try {
@@ -280,11 +282,9 @@ export default function VideoMeetComponent() {
                             .getTracks()
                             .forEach((t) => pc.addTrack(t, localStream));
                     } catch (e) {}
-
                     connectionsRef.current[clientId] = pc;
                 }
             });
-
             const ordered = clients
                 .filter((c) => c !== socketIdRef.current)
                 .map((c) => ({
@@ -292,7 +292,6 @@ export default function VideoMeetComponent() {
                     stream: videoMapRef.current[c] || null,
                 }));
             setVideos(ordered);
-
             if (id === socketIdRef.current) {
                 for (let otherId in connectionsRef.current) {
                     if (otherId === socketIdRef.current) continue;
@@ -314,6 +313,7 @@ export default function VideoMeetComponent() {
         });
     };
 
+    // ... (gotMessageFromServer function is unchanged)
     const gotMessageFromServer = (fromId, message) => {
         let signal = JSON.parse(message);
         if (fromId === socketIdRef.current) return;
@@ -379,6 +379,7 @@ export default function VideoMeetComponent() {
         }
     };
 
+    // ... (first useEffect cleanup is unchanged)
     useEffect(() => {
         return () => {
             try {
@@ -403,6 +404,7 @@ export default function VideoMeetComponent() {
         };
     }, []);
 
+    // ... (chatScrollRef effect is unchanged)
     useEffect(() => {
         if (chatScrollRef.current) {
             chatScrollRef.current.scrollTop =
@@ -410,6 +412,7 @@ export default function VideoMeetComponent() {
         }
     }, [messages]);
 
+    // ... (sendMessage and chat handlers are unchanged)
     const sendMessage = useCallback(() => {
         if (!message.trim() || !socketRef.current) return;
         const msg = message.trim();
@@ -425,12 +428,9 @@ export default function VideoMeetComponent() {
         ]);
         setMessage("");
     }, [message, username]);
-
-    // Added handlers for chat input
     const handleChatInput = (e) => {
         setMessage(e.target.value);
     };
-
     const handleChatKeyDown = (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -438,6 +438,7 @@ export default function VideoMeetComponent() {
         }
     };
 
+    // ... (media toggle handlers are unchanged)
     const handleToggleVideo = async () => {
         setVideoEnabled((v) => {
             const next = !v;
@@ -451,7 +452,6 @@ export default function VideoMeetComponent() {
             return next;
         });
     };
-
     const handleToggleAudio = () => {
         setAudioEnabled((prev) => {
             const next = !prev;
@@ -479,6 +479,7 @@ export default function VideoMeetComponent() {
         });
     };
 
+    // ... (handleScreenShare function is unchanged)
     const handleScreenShare = async () => {
         if (!screenAvailable) return;
         if (!screenSharing) {
@@ -503,7 +504,6 @@ export default function VideoMeetComponent() {
                     } catch (e) {}
                 });
 
-                // Update local stream and video element
                 window.localStream = screenStream;
                 if (localVideoRef.current)
                     localVideoRef.current.srcObject = screenStream;
@@ -554,14 +554,10 @@ export default function VideoMeetComponent() {
                 console.warn("Screen share failed:", e);
             }
         } else {
-            // Stop screen sharing (user clicked stop button)
-            // This logic is mostly handled by the 'onended' event,
-            // but we can force it if needed.
             try {
                 if (window.localStream) {
                     window.localStream.getTracks().forEach((t) => t.stop());
                 }
-                // The 'onended' listener should then fire and restore the camera.
             } catch (e) {
                 console.warn("Error stopping screen share:", e);
             }
@@ -569,6 +565,7 @@ export default function VideoMeetComponent() {
         }
     };
 
+    // ... (handleEndCall function is unchanged)
     const handleEndCall = () => {
         try {
             if (window.localStream) {
@@ -585,43 +582,57 @@ export default function VideoMeetComponent() {
                 socketRef.current.disconnect();
             } catch (e) {}
         }
-        window.location.href = "/"; // Or any other lobby/home page
+        window.location.href = "/"; // Redirect to home
     };
 
-    const connect = () => {
+    // 8. --- UPDATED CONNECT FUNCTION ---
+    const connect = async () => {
         if (!username.trim()) {
             alert("Please enter your name.");
             return;
         }
+
+        // --- THIS IS THE NEW LOGIC ---
+        // If the user is logged in, save this room to history
+        if (isAuthenticated) {
+            try {
+                await addToUserHistory(roomId);
+            } catch (err) {
+                console.warn("Could not add to history.", err);
+                // Don't block them, just log the error
+            }
+        }
+        // --- END NEW LOGIC ---
+
         setAskForUsername(false);
         getMediaAndConnect();
     };
 
-    // 2. UPDATED: This entire `return` block is replaced.
+    // 9. --- RENDER FUNCTION (Lobby UI is unchanged) ---
     return (
         <div>
             {askForUsername ? (
-                // --- THIS IS THE NEW ADVANCED LOBBY UI ---
+                // --- LOBBY UI ---
                 <Box
                     sx={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         minHeight: "100vh",
-                        bgcolor: "#282c34", // Dark background
+                        bgcolor: "#282c34",
                         p: 2,
                     }}
                 >
                     <Paper
                         elevation={3}
                         sx={{
-                            p: { xs: 2, sm: 4 }, // Responsive padding
+                            p: { xs: 2, sm: 4 },
                             borderRadius: "16px",
                             maxWidth: "500px",
                             width: "100%",
                             display: "flex",
                             flexDirection: "column",
-                            gap: 2, // Spacing between elements
+                            gap: 2,
                         }}
                     >
                         <Typography
@@ -631,10 +642,10 @@ export default function VideoMeetComponent() {
                             gutterBottom
                             fontWeight="bold"
                         >
-                            Join Lobby
+                            {/* 10. Show the Room ID in the lobby */}
+                            Join Room: {roomId}
                         </Typography>
 
-                        {/* Video Preview */}
                         <Box
                             sx={{
                                 position: "relative",
@@ -655,10 +666,9 @@ export default function VideoMeetComponent() {
                                     width: "100%",
                                     height: "100%",
                                     objectFit: "cover",
-                                    display: videoEnabled ? "block" : "none", // Hide video if disabled
+                                    display: videoEnabled ? "block" : "none",
                                 }}
                             />
-                            {/* Show placeholder if video is off */}
                             {!videoEnabled && (
                                 <Box
                                     sx={{
@@ -674,7 +684,6 @@ export default function VideoMeetComponent() {
                                     <VideocamOffIcon sx={{ fontSize: 60 }} />
                                 </Box>
                             )}
-                            {/* Controls */}
                             <Box
                                 sx={{
                                     position: "absolute",
@@ -732,8 +741,6 @@ export default function VideoMeetComponent() {
                                 </IconButton>
                             </Box>
                         </Box>
-
-                        {/* Username Input */}
                         <TextField
                             id="outlined-basic"
                             label="Enter Your Name"
@@ -744,8 +751,6 @@ export default function VideoMeetComponent() {
                             fullWidth
                             required
                         />
-
-                        {/* Connect Button */}
                         <Button
                             variant="contained"
                             color="primary"
@@ -763,18 +768,16 @@ export default function VideoMeetComponent() {
                     </Paper>
                 </Box>
             ) : (
-                // --- YOUR ORIGINAL CALL UI (UNCHANGED) ---
+                // --- FULL CALL UI (Unchanged) ---
                 <div className={styles.meetVideoContainer}>
-                    {/* Main content area */}
+                    {/* ... (all your existing call UI) ... */}
                     <div
                         style={{
                             display: "flex",
                             width: "100%",
-                            flex: 1, // <-- This is the fix
-                            overflow: "hidden", // Prevents this container from scrolling
+                            height: "100%",
                         }}
                     >
-                        {/* Chat Panel */}
                         {showChat && (
                             <div className={styles.chatRoom}>
                                 <div className={styles.chatHeader}>
@@ -790,7 +793,6 @@ export default function VideoMeetComponent() {
                                             const mine =
                                                 item.socketIdSender ===
                                                 socketIdRef.current;
-
                                             const timeStr = item.time
                                                 ? new Date(
                                                       item.time
@@ -799,7 +801,6 @@ export default function VideoMeetComponent() {
                                                       minute: "2-digit",
                                                   })
                                                 : "";
-
                                             return (
                                                 <div
                                                     key={index}
@@ -842,7 +843,6 @@ export default function VideoMeetComponent() {
                                         </div>
                                     )}
                                 </div>
-
                                 <div className={styles.chatInputArea}>
                                     <TextField
                                         label="Type a message..."
@@ -865,12 +865,10 @@ export default function VideoMeetComponent() {
                                 </div>
                             </div>
                         )}
-
-                        {/* Video Grid */}
                         <div
                             className={styles.conferenceView}
                             style={{
-                                flex: 1, // Take remaining space
+                                flex: 1,
                                 display: "flex",
                                 flexWrap: "wrap",
                                 gap: 8,
@@ -879,7 +877,6 @@ export default function VideoMeetComponent() {
                                 alignContent: "flex-start",
                             }}
                         >
-                            {/* Local video feed */}
                             <div
                                 style={{
                                     width: 240,
@@ -891,7 +888,7 @@ export default function VideoMeetComponent() {
                                 }}
                             >
                                 <video
-                                    ref={localVideoRef} // Attached ref
+                                    ref={localVideoRef}
                                     autoPlay
                                     muted
                                     playsInline
@@ -916,8 +913,6 @@ export default function VideoMeetComponent() {
                                     {username} (You)
                                 </div>
                             </div>
-
-                            {/* Remote video feeds */}
                             {videos.map((v) => (
                                 <div
                                     key={v.socketId}
@@ -954,13 +949,10 @@ export default function VideoMeetComponent() {
                                             objectFit: "cover",
                                         }}
                                     />
-                                    {/* You would need to emit/sync usernames to display them here */}
                                 </div>
                             ))}
                         </div>
                     </div>
-
-                    {/* Control Buttons */}
                     <div className={styles.buttonContainers}>
                         <IconButton
                             onClick={handleToggleVideo}
@@ -972,14 +964,12 @@ export default function VideoMeetComponent() {
                                 <VideocamOffIcon />
                             )}
                         </IconButton>
-
                         <IconButton
                             onClick={handleToggleAudio}
                             style={{ color: audioEnabled ? "white" : "red" }}
                         >
                             {audioEnabled ? <MicIcon /> : <MicOffIcon />}
                         </IconButton>
-
                         {screenAvailable && (
                             <IconButton
                                 onClick={handleScreenShare}
@@ -994,11 +984,9 @@ export default function VideoMeetComponent() {
                                 )}
                             </IconButton>
                         )}
-
                         <IconButton onClick={handleEndCall}>
                             <CallEndIcon style={{ color: "#ff4747" }} />
                         </IconButton>
-
                         <IconButton
                             onClick={() => {
                                 setShowChat((prev) => !prev);

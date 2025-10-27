@@ -1,19 +1,19 @@
-import React, { useState, useEffect, useContext } from "react"; // 1. Added useContext
-import { Link, useNavigate } from "react-router-dom"; // 2. Re-added useNavigate
+import React, { useState, useEffect, useContext } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
     Video,
     LogIn,
     Users,
     Plus,
     LogOut,
-    History, // 3. Added History icon
+    History as HistoryIcon, // Renamed to avoid conflict
 } from "lucide-react";
 import { checkAuth } from "../auth.js";
-import { AuthContext } from "../contexts/AuthContext"; // 4. Import AuthContext
+import { AuthContext } from "../contexts/AuthContext";
 
 export default function LandingPage() {
     const navigate = useNavigate();
-    const { addToUserHistory } = useContext(AuthContext); // 5. Get history function
+    const { addToUserHistory } = useContext(AuthContext);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [roomId, setRoomId] = useState("");
 
@@ -21,52 +21,60 @@ export default function LandingPage() {
         setIsAuthenticated(checkAuth());
     }, []);
 
-    /**
-     * Generates a random string for a new room ID and navigates to it.
-     */
+    // --- LOGGED-IN USER ACTIONS ---
     const createAndJoinRoom = async () => {
-        // 6. Make function async
         const newRoomId = Math.random().toString(36).substring(2, 9);
+        try {
+            // This is an authenticated action
+            await addToUserHistory(newRoomId);
+            navigate(`/${newRoomId}`);
+        } catch (err) {
+            console.error("Failed to add to history:", err);
+            // Don't navigate if history failed, as user might be logged out
+        }
+    };
 
-        // 7. Add to history if logged in
-        if (isAuthenticated && addToUserHistory) {
+    const joinRoom = async () => {
+        if (roomId.trim()) {
+            const trimmedRoomId = roomId.trim();
             try {
-                await addToUserHistory(newRoomId);
+                // This is an authenticated action
+                await addToUserHistory(trimmedRoomId);
+                navigate(`/${trimmedRoomId}`);
             } catch (err) {
                 console.error("Failed to add to history:", err);
             }
-        }
-        navigate(`/${newRoomId}`); // Use navigate for cleaner routing
-    };
-
-    /**
-     * Navigates to the room ID entered in the input field.
-     */
-    const joinRoom = async () => {
-        // 8. Make function async
-        if (roomId.trim()) {
-            const trimmedRoomId = roomId.trim();
-
-            // 9. Add to history if logged in
-            if (isAuthenticated && addToUserHistory) {
-                try {
-                    await addToUserHistory(trimmedRoomId);
-                } catch (err) {
-                    console.error("Failed to add to history:", err);
-                }
-            }
-            navigate(`/${trimmedRoomId}`); // Use navigate
         } else {
             console.warn("Room ID cannot be empty");
         }
     };
 
-    /**
-     * Handles key press on the input field to join on "Enter".
-     */
+    // --- GUEST USER ACTIONS ---
+    const createAndJoinGuest = () => {
+        const newRoomId = Math.random().toString(36).substring(2, 9);
+        // No history, just navigate
+        navigate(`/${newRoomId}`);
+    };
+
+    const joinGuest = () => {
+        if (roomId.trim()) {
+            // No history, just navigate
+            navigate(`/${roomId.trim()}`);
+        } else {
+            console.warn("Room ID cannot be empty");
+        }
+    };
+
+    // --- SHARED ACTIONS ---
     const handleJoinKeyPress = (e) => {
         if (e.key === "Enter") {
-            joinRoom();
+            // The "Enter" key will trigger the correct
+            // join function based on auth state
+            if (isAuthenticated) {
+                joinRoom();
+            } else {
+                joinGuest();
+            }
         }
     };
 
@@ -82,28 +90,23 @@ export default function LandingPage() {
             <nav className="w-full bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-20">
-                        {/* Logo / Title */}
                         <div className="flex-shrink-0 flex items-center gap-2">
                             <Video className="h-8 w-8 text-blue-400" />
                             <h2 className="text-2xl font-bold text-white">
                                 Apna Video Call
                             </h2>
                         </div>
-
-                        {/* --- CONDITIONAL NAVIGATION LINKS --- */}
                         <div className="hidden md:flex items-center space-x-6">
                             {isAuthenticated ? (
-                                // --- Show this if LOGGED IN ---
+                                // --- LOGGED-IN NAV ---
                                 <>
-                                    {/* 10. Added History Link */}
                                     <Link
                                         to="/history"
                                         className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
                                     >
-                                        <History className="h-5 w-5" />
+                                        <HistoryIcon className="h-5 w-5" />
                                         History
                                     </Link>
-
                                     <button
                                         onClick={handleLogout}
                                         className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-transform duration-200 ease-in-out hover:scale-105 flex items-center gap-2"
@@ -113,7 +116,7 @@ export default function LandingPage() {
                                     </button>
                                 </>
                             ) : (
-                                // --- Show this if LOGGED OUT ---
+                                // --- GUEST NAV ---
                                 <>
                                     <Link
                                         to="/auth"
@@ -136,7 +139,7 @@ export default function LandingPage() {
                 </div>
             </nav>
 
-            {/* --- Hero Section (Unchanged) --- */}
+            {/* --- Hero Section --- */}
             <main className="flex-1 flex items-center">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-12 py-16 md:py-24">
@@ -146,45 +149,78 @@ export default function LandingPage() {
                                 <span className="text-blue-400">Connect</span>{" "}
                                 with your loved ones, instantly.
                             </h1>
-
                             <p className="mt-6 text-lg md:text-xl text-gray-300 max-w-lg mx-auto lg:mx-0">
-                                Cover the distance with Apna Video Call.
-                                High-quality, secure video meetings for
-                                everyone.
+                                {isAuthenticated
+                                    ? "Create a new room or join one. Your meetings will be saved to your history."
+                                    : "Join as a guest or log in for the full experience."}
                             </p>
 
-                            {/* Call to Action Buttons */}
+                            {/* --- Call to Action Buttons --- */}
+                            {/* --- THIS IS THE NEW CONDITIONAL LOGIC --- */}
                             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                                {/* Create New Meeting */}
-                                <button
-                                    onClick={createAndJoinRoom}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-transform duration-200 ease-in-out hover:scale-105 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
-                                >
-                                    <Plus className="h-6 w-6" />
-                                    New Meeting
-                                </button>
-
-                                {/* Join Existing Meeting */}
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={roomId}
-                                        onChange={(e) =>
-                                            setRoomId(e.target.value)
-                                        }
-                                        onKeyPress={handleJoinKeyPress}
-                                        placeholder="Enter Room ID"
-                                        className="flex-1 sm:flex-auto bg-gray-800 border border-gray-700 text-white px-5 py-4 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        aria-label="Enter Room ID"
-                                    />
-                                    <button
-                                        onClick={joinRoom}
-                                        className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex-shrink-0"
-                                        aria-label="Join Room"
-                                    >
-                                        <LogIn className="h-6 w-6" />
-                                    </button>
-                                </div>
+                                {isAuthenticated ? (
+                                    // --- LOGGED-IN BUTTONS ---
+                                    <>
+                                        <button
+                                            onClick={createAndJoinRoom}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-transform duration-200 ease-in-out hover:scale-105 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30"
+                                        >
+                                            <Plus className="h-6 w-6" />
+                                            New Meeting
+                                        </button>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={roomId}
+                                                onChange={(e) =>
+                                                    setRoomId(e.target.value)
+                                                }
+                                                onKeyPress={handleJoinKeyPress}
+                                                placeholder="Enter Room ID"
+                                                className="flex-1 sm:flex-auto bg-gray-800 border border-gray-700 text-white px-5 py-4 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                aria-label="Enter Room ID"
+                                            />
+                                            <button
+                                                onClick={joinRoom}
+                                                className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex-shrink-0"
+                                                aria-label="Join Room"
+                                            >
+                                                <LogIn className="h-6 w-6" />
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    // --- GUEST BUTTONS ---
+                                    <>
+                                        <button
+                                            onClick={createAndJoinGuest}
+                                            className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-transform duration-200 ease-in-out hover:scale-105 flex items-center justify-center gap-2 shadow-lg shadow-green-500/30"
+                                        >
+                                            <Plus className="h-6 w-6" />
+                                            Create Guest Room
+                                        </button>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={roomId}
+                                                onChange={(e) =>
+                                                    setRoomId(e.target.value)
+                                                }
+                                                onKeyPress={handleJoinKeyPress}
+                                                placeholder="Enter Room ID"
+                                                className="flex-1 sm:flex-auto bg-gray-800 border border-gray-700 text-white px-5 py-4 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                                aria-label="Enter Room ID"
+                                            />
+                                            <button
+                                                onClick={joinGuest}
+                                                className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex-shrink-0"
+                                                aria-label="Join as Guest"
+                                            >
+                                                <LogIn className="h-6 w-6" />
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 
