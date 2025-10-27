@@ -1,59 +1,215 @@
+/* ===== Base Layout ===== */
 .meetVideoContainer {
-    position: relative;
+    display: flex;
+    flex-direction: column; /* Changed to column for main layout */
+    justify-content: space-between;
+    align-items: stretch;
     height: 100vh;
     background: rgb(1, 4, 48);
+    color: white;
+    overflow: hidden;
+    position: relative;
 }
 
+/* ===== Video Section ===== */
+.conferenceView {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
+    align-content: flex-start;
+    justify-content: center;
+    overflow-y: auto; /* Allow scrolling if videos overflow */
+}
+
+/* Individual video styling is now inline in the JSX for simplicity */
+/* You can move it here if you prefer */
+
+/* ===== Local Video (Legacy, can be removed if not used) ===== */
 .meetUserVideo {
     position: absolute;
-    bottom: 10vh;
-    height: 20vh;
+    bottom: 12vh;
+    left: 20px;
+    height: 18vh;
     width: auto;
-    left: 0;
-    border-radius: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    border: 2px solid white;
 }
 
+/* ===== Controls ===== */
 .buttonContainers {
-    position: absolute;
-    width: 100vw;
-    bottom: 0;
-    text-align: center;
+    /* Removed position: absolute */
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2.5rem;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px 30px;
+    /* Removed backdrop-filter as it can be slow */
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3); /* Added shadow for separation */
+    z-index: 10;
 }
 
 .buttonContainers svg {
-    font-size: 3rem;
+    font-size: 2.2rem; /* Adjusted size */
+    cursor: pointer;
+    color: white;
+    transition: 0.2s ease;
 }
 
-.conferenceView {
-    display: flex;
-
-    padding: 10px;
-    gap: 10px;
+.buttonContainers svg:hover {
+    transform: scale(1.1);
 }
 
-.conferenceView video {
-    width: 40vw;
-    height: 20vh;
-    min-width: 30vw;
-    border-radius: 10px;
-}
+/* Specific hover colors handled inline */
 
+/* ===== Chat Panel ===== */
 .chatRoom {
-    position: absolute;
-    height: 90vh;
-    right: 0;
-    background: white;
-    border-radius: 10px;
-    width: 30vw;
-    padding-inline: 20px;
+    width: 28vw;
+    min-width: 320px;
+    max-width: 400px; /* Added max-width */
+    background: #ffffff;
+    color: black;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%; /* Make chat fill height */
+    border-right: 1px solid #333; /* Add separator */
 }
 
-.chatContainer {
-    position: relative;
-    height: 100%;
+.chatHeader {
+    background: #029c21;
+    color: white;
+    padding: 4px 16px; /* Adjusted padding */
+    text-align: center;
+    border-bottom: 1px solid #001a36;
 }
 
+.chatHeader h2 {
+    margin: 10px 0;
+    font-size: 1.25rem;
+}
+
+/* ===== Chat Messages ===== */
 .chattingArea {
-    position: absolute;
-    bottom: 0;
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 12px; /* Increased padding */
+    background: #f5f7fa;
+    scroll-behavior: smooth;
+    display: flex; /* ADDED */
+    flex-direction: column; /* ADDED */
+    gap: 4px; /* Added gap between messages */
+}
+
+.chattingArea::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chattingArea::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 6px;
+}
+
+.myMessage {
+    align-self: flex-end;
+    background: #1976d2;
+    color: white;
+    margin: 4px 0; /* Adjusted margin */
+    padding: 8px 12px;
+    border-radius: 10px 10px 0 10px;
+    max-width: 80%; /* Increased max-width */
+    word-break: break-word;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.otherMessage {
+    align-self: flex-start;
+    background: #e3e3e3;
+    color: #000;
+    margin: 4px 0; /* Adjusted margin */
+    padding: 8px 12px;
+    border-radius: 10px 10px 10px 0;
+    max-width: 80%; /* Increased max-width */
+    word-break: break-word;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.sender {
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.9;
+    margin-bottom: 4px;
+}
+
+.timestamp {
+    display: block;
+    font-size: 0.65rem;
+    margin-top: 5px;
+    text-align: right;
+    opacity: 0.7;
+}
+
+.myMessage .timestamp {
+    opacity: 0.8;
+}
+
+.chatInputArea {
+    display: flex;
+    align-items: center;
+    padding: 12px; /* Increased padding */
+    border-top: 1px solid #ddd;
+    background: #fdfdfd;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+    .chatRoom {
+        width: 35vw;
+        min-width: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* On mobile, we hide the chat by default, and the button toggles it */
+    /* The \`showChat\` state handles the visibility */
+    .chatRoom {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 20;
+        min-width: unset;
+        border-right: none;
+    }
+
+    .conferenceView {
+        padding-bottom: 10vh; /* Space for controls */
+    }
+
+    /* Video tiles should be stacked */
+    .conferenceView {
+        justify-content: flex-start;
+    }
+
+    /* Style for video blocks on mobile */
+    /* This is handled by inline styles, but you could use a class */
+
+    .buttonContainers {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        gap: 1.5rem;
+        padding: 10px 15px;
+        z-index: 30; /* Above chat */
+    }
+
+    .buttonContainers svg {
+        font-size: 2.2rem;
+    }
 }

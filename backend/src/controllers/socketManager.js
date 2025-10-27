@@ -1,8 +1,10 @@
 import { Server } from "socket.io";
 
-let connections = {};
+// --- CHANGED ---
+// We no longer need 'connections'. Socket.IO will manage this.
+// We still need 'messages' for chat history.
 let messages = {};
-let timeOnline = {};
+// 'timeOnline' is not used, so it's removed.
 
 export const connectToSocket = (server) => {
     const io = new Server(server, {
@@ -15,100 +17,86 @@ export const connectToSocket = (server) => {
     });
 
     io.on("connection", (socket) => {
-        console.log("SOMETHING CONNECTED");
+        // --- CHANGED ---
+        // More descriptive log
+        console.log(`User ${socket.id} connected.`);
 
         socket.on("join-call", (path) => {
-            if (connections[path] === undefined) {
-                connections[path] = [];
-            }
-            connections[path].push(socket.id);
+            // --- CHANGED ---
+            // Use Socket.IO's room feature. This is much faster.
+            socket.join(path);
+            // Store the room path on the socket object for easy access later.
+            socket.room = path;
 
-            timeOnline[socket.id] = new Date();
+            // Get a list of all clients in the room.
+            // This is a Set, so we convert it to an array.
+            const clients = io.sockets.adapter.rooms.get(path);
+            const clientsArr = clients ? Array.from(clients) : [];
 
-            // connections[path].forEach(elem => {
-            //     io.to(elem)
-            // })
+            // Emit 'user-joined' to EVERYONE in the room (including the new user).
+            io.to(path).emit("user-joined", socket.id, clientsArr);
 
-            for (let a = 0; a < connections[path].length; a++) {
-                io.to(connections[path][a]).emit(
-                    "user-joined",
-                    socket.id,
-                    connections[path]
-                );
-            }
-
+            // Send existing chat history ONLY to the new user.
             if (messages[path] !== undefined) {
-                for (let a = 0; a < messages[path].length; ++a) {
+                messages[path].forEach((msg) => {
                     io.to(socket.id).emit(
                         "chat-message",
-                        messages[path][a]["data"],
-                        messages[path][a]["sender"],
-                        messages[path][a]["socket-id-sender"]
+                        msg.data,
+                        msg.sender,
+                        msg.socketIdSender
                     );
-                }
+                });
             }
         });
 
         socket.on("signal", (toId, message) => {
+            // This logic is perfect, no change needed.
             io.to(toId).emit("signal", socket.id, message);
         });
 
         socket.on("chat-message", (data, sender) => {
-            const [matchingRoom, found] = Object.entries(connections).reduce(
-                ([room, isFound], [roomKey, roomValue]) => {
-                    if (!isFound && roomValue.includes(socket.id)) {
-                        return [roomKey, true];
-                    }
+            // --- CHANGED ---
+            // This is now O(1) (instant) instead of iterating all rooms.
+            const room = socket.room;
 
-                    return [room, isFound];
-                },
-                ["", false]
-            );
-
-            if (found === true) {
-                if (messages[matchingRoom] === undefined) {
-                    messages[matchingRoom] = [];
+            if (room) {
+                if (messages[room] === undefined) {
+                    messages[room] = [];
                 }
-
-                messages[matchingRoom].push({
+                messages[room].push({
                     sender: sender,
                     data: data,
-                    "socket-id-sender": socket.id,
+                    // Switched to camelCase for convention
+                    socketIdSender: socket.id,
                 });
-                console.log("message", matchingRoom, ":", sender, data);
+                console.log("message", room, ":", sender, data);
 
-                connections[matchingRoom].forEach((elem) => {
-                    io.to(elem).emit("chat-message", data, sender, socket.id);
-                });
+                // Broadcast the message to EVERYONE in the room.
+                io.to(room).emit("chat-message", data, sender, socket.id);
             }
         });
 
         socket.on("disconnect", () => {
-            var diffTime = Math.abs(timeOnline[socket.id] - new Date());
+            // --- CHANGED ---
+            // Removed unused 'diffTime' calculation.
 
-            var key;
+            // This is now O(1) (instant) instead of the complex loop.
+            const room = socket.room;
 
-            for (const [k, v] of JSON.parse(
-                JSON.stringify(Object.entries(connections))
-            )) {
-                for (let a = 0; a < v.length; ++a) {
-                    if (v[a] === socket.id) {
-                        key = k;
+            if (room) {
+                // Tell everyone else in the room that this user left.
+                io.to(room).emit("user-left", socket.id);
 
-                        for (let a = 0; a < connections[key].length; ++a) {
-                            io.to(connections[key][a]).emit(
-                                "user-left",
-                                socket.id
-                            );
-                        }
+                // Socket.IO handles 'socket.leave(room)' automatically on disconnect.
 
-                        var index = connections[key].indexOf(socket.id);
-
-                        connections[key].splice(index, 1);
-
-                        if (connections[key].length === 0) {
-                            delete connections[key];
-                        }
+                // --- FIX: MEMORY LEAK ---
+                // Check if the room is now empty.
+                const clients = io.sockets.adapter.rooms.get(room);
+                if (!clients || clients.size === 0) {
+                    // If the room is empty, delete its chat history
+                    if (messages[room] !== undefined) {
+                        delete messages[room];
+                        console.log(`Cleaned up empty room: ${room}`);
                     }
                 }
             }

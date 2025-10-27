@@ -3,176 +3,326 @@ import Avatar from "@mui/material/Avatar";
 import Button from "@mui/material/Button";
 import CssBaseline from "@mui/material/CssBaseline";
 import TextField from "@mui/material/TextField";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Checkbox from "@mui/material/Checkbox";
 import Link from "@mui/material/Link";
 import Paper from "@mui/material/Paper";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import Typography from "@mui/material/Typography";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { createTheme, ThemeProvider, styled } from "@mui/material/styles"; // Import styled
 import { AuthContext } from "../contexts/AuthContext";
-import { Snackbar } from "@mui/material";
+import {
+    Snackbar,
+    Alert,
+    CircularProgress,
+    ToggleButton, // Import ToggleButton
+    ToggleButtonGroup, // Import ToggleButtonGroup
+} from "@mui/material";
+import { useLocation } from "react-router-dom";
 
-// TODO remove, this demo shouldn't need to reset the theme.
+// A simple Copyright component for the bottom
+function Copyright(props) {
+    return (
+        <Typography
+            variant="body2"
+            color="text.secondary"
+            align="center"
+            {...props}
+        >
+            {"Copyright © "}
+            <Link color="inherit" href="/">
+                Apna Video Call
+            </Link>{" "}
+            {new Date().getFullYear()}
+            {"."}
+        </Typography>
+    );
+}
 
-const defaultTheme = createTheme();
+// 1. Create a "2025" dark theme
+const darkTheme = createTheme({
+    palette: {
+        mode: "dark",
+        primary: {
+            main: "#38bdf8", // A blue accent, similar to your landing page
+        },
+        background: {
+            default: "#111827", // Matches bg-gray-900
+            paper: "rgba(17, 24, 39, 0.8)", // Dark, semi-transparent
+        },
+    },
+    typography: {
+        fontFamily: "Inter, sans-serif", // Match your landing page font
+    },
+});
+
+// 2. Create a styled "Glass" Paper component
+const GlassPaper = styled(Paper)(({ theme }) => ({
+    padding: theme.spacing(4),
+    backdropFilter: "blur(12px) saturate(180%)",
+    WebkitBackdropFilter: "blur(12px) saturate(180%)", // For Safari
+    background: "rgba(17, 24, 39, 0.75)", // Semi-transparent dark
+    borderRadius: "16px",
+    border: "1px solid rgba(255, 255, 255, 0.125)",
+}));
+
+// 3. Create a styled ToggleButtonGroup
+const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
+    width: "100%",
+    marginBottom: theme.spacing(2),
+    "& .MuiToggleButtonGroup-grouped": {
+        flex: 1,
+        border: 0,
+        "&.Mui-disabled": {
+            border: 0,
+        },
+        "&:not(:first-of-type)": {
+            borderRadius: theme.shape.borderRadius,
+        },
+        "&:first-of-type": {
+            borderRadius: theme.shape.borderRadius,
+        },
+    },
+}));
 
 export default function Authentication() {
-    const [username, setUsername] = React.useState();
-    const [password, setPassword] = React.useState();
-    const [name, setName] = React.useState();
-    const [error, setError] = React.useState();
-    const [message, setMessage] = React.useState();
+    const [username, setUsername] = React.useState("");
+    const [password, setPassword] = React.useState("");
+    const [name, setName] = React.useState("");
+    const [error, setError] = React.useState("");
+    const [message, setMessage] = React.useState("");
+    const [loading, setLoading] = React.useState(false);
+    const [view, setView] = React.useState("login"); // Use 'login' or 'register'
+    const [openSnackbar, setOpenSnackbar] = React.useState(false);
 
-    const [formState, setFormState] = React.useState(0);
-
-    const [open, setOpen] = React.useState(false);
-
+    const { state } = useLocation();
     const { handleRegister, handleLogin } = React.useContext(AuthContext);
 
-    let handleAuth = async () => {
+    const handleAuth = async (event) => {
+        event.preventDefault();
+        setError("");
+        setLoading(true);
+
         try {
-            if (formState === 0) {
-                let result = await handleLogin(username, password);
-            }
-            if (formState === 1) {
+            const redirectPath = state?.from?.pathname;
+            if (view === "login") {
+                await handleLogin(username, password, redirectPath);
+            } else {
                 let result = await handleRegister(name, username, password);
-                console.log(result);
-                setUsername("");
                 setMessage(result);
-                setOpen(true);
-                setError("");
-                setFormState(0);
+                setOpenSnackbar(true);
+                setUsername("");
                 setPassword("");
+                setName("");
+                setView("login"); // Switch to login view
             }
         } catch (err) {
-            console.log(err);
-            let message = err.response.data.message;
-            setError(message);
+            const msg =
+                err.response?.data?.message ||
+                "An unknown error occurred. Please try again.";
+            setError(msg);
+        } finally {
+            setLoading(false);
         }
     };
 
+    const handleViewChange = (event, newView) => {
+        if (newView !== null) {
+            setView(newView);
+            setError("");
+        }
+    };
+
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === "clickaway") return;
+        setOpenSnackbar(false);
+    };
+
+    // 4. Use the new darkTheme
     return (
-        <ThemeProvider theme={defaultTheme}>
-            <Grid container component="main" sx={{ height: "100vh" }}>
+        <ThemeProvider theme={darkTheme}>
+            {/* 5. Main Grid is now the full-screen background container */}
+            <Grid
+                container
+                component="main"
+                sx={{
+                    height: "100vh",
+                    backgroundImage:
+                        "url(https://source.unsplash.com/random?wallpapers)",
+                    backgroundRepeat: "no-repeat",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                }}
+            >
                 <CssBaseline />
-                <Grid
-                    item
-                    xs={false}
-                    sm={4}
-                    md={7}
-                    sx={{
-                        backgroundImage:
-                            "url(https://source.unsplash.com/random?wallpapers)",
-                        backgroundRepeat: "no-repeat",
-                        backgroundColor: (t) =>
-                            t.palette.mode === "light"
-                                ? t.palette.grey[50]
-                                : t.palette.grey[900],
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                    }}
-                />
-                <Grid
-                    item
-                    xs={12}
-                    sm={8}
-                    md={5}
-                    component={Paper}
-                    elevation={6}
-                    square
-                >
-                    <Box
-                        sx={{
-                            my: 8,
-                            mx: 4,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                        }}
-                    >
-                        <Avatar sx={{ m: 1, bgcolor: "secondary.main" }}>
-                            <LockOutlinedIcon />
-                        </Avatar>
-
-                        <div>
-                            <Button
-                                variant={formState === 0 ? "contained" : ""}
-                                onClick={() => {
-                                    setFormState(0);
-                                }}
+                {/* 6. A centered Grid item holds the Glass form */}
+                <Grid item xs={11} sm={8} md={5} lg={4} xl={3}>
+                    {/* 7. Use the styled GlassPaper component */}
+                    <GlassPaper elevation={12}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                            }}
+                        >
+                            <Avatar sx={{ m: 1, bgcolor: "primary.main" }}>
+                                <LockOutlinedIcon />
+                            </Avatar>
+                            <Typography
+                                component="h1"
+                                variant="h5"
+                                sx={{ mb: 2 }}
                             >
-                                Sign In
-                            </Button>
-                            <Button
-                                variant={formState === 1 ? "contained" : ""}
-                                onClick={() => {
-                                    setFormState(1);
-                                }}
-                            >
-                                Sign Up
-                            </Button>
-                        </div>
+                                {view === "login"
+                                    ? "Welcome Back"
+                                    : "Create Account"}
+                            </Typography>
 
-                        <Box component="form" noValidate sx={{ mt: 1 }}>
-                            {formState === 1 ? (
+                            {/* 8. Use the styled ToggleButtonGroup */}
+                            <StyledToggleButtonGroup
+                                value={view}
+                                exclusive
+                                onChange={handleViewChange}
+                                aria-label="Login or Register"
+                            >
+                                <ToggleButton value="login" aria-label="login">
+                                    Sign In
+                                </ToggleButton>
+                                <ToggleButton
+                                    value="register"
+                                    aria-label="register"
+                                >
+                                    Sign Up
+                                </ToggleButton>
+                            </StyledToggleButtonGroup>
+
+                            <Box
+                                component="form"
+                                noValidate
+                                onSubmit={handleAuth}
+                                sx={{ mt: 1, width: "100%" }}
+                            >
+                                {view === "register" && (
+                                    <TextField
+                                        margin="normal"
+                                        required
+                                        fullWidth
+                                        id="name"
+                                        label="Full Name"
+                                        name="name"
+                                        autoComplete="name"
+                                        value={name}
+                                        autoFocus
+                                        onChange={(e) =>
+                                            setName(e.target.value)
+                                        }
+                                        variant="filled" // Use filled for a modern look
+                                    />
+                                )}
+
                                 <TextField
                                     margin="normal"
                                     required
                                     fullWidth
                                     id="username"
-                                    label="Full Name"
+                                    label="Username"
                                     name="username"
-                                    value={name}
-                                    autoFocus
-                                    onChange={(e) => setName(e.target.value)}
+                                    autoComplete="username"
+                                    value={username}
+                                    autoFocus={view === "login"}
+                                    onChange={(e) =>
+                                        setUsername(e.target.value)
+                                    }
+                                    variant="filled"
                                 />
-                            ) : (
-                                <></>
-                            )}
+                                <TextField
+                                    margin="normal"
+                                    required
+                                    fullWidth
+                                    name="password"
+                                    label="Password"
+                                    type="password"
+                                    id="password"
+                                    autoComplete={
+                                        view === "login"
+                                            ? "current-password"
+                                            : "new-password"
+                                    }
+                                    value={password}
+                                    onChange={(e) =>
+                                        setPassword(e.target.value)
+                                    }
+                                    variant="filled"
+                                />
 
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                id="username"
-                                label="Username"
-                                name="username"
-                                value={username}
-                                autoFocus
-                                onChange={(e) => setUsername(e.target.value)}
-                            />
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                name="password"
-                                label="Password"
-                                value={password}
-                                type="password"
-                                onChange={(e) => setPassword(e.target.value)}
-                                id="password"
-                            />
+                                {error && (
+                                    <Alert
+                                        severity="error"
+                                        sx={{ mt: 2, mb: 1 }}
+                                    >
+                                        {error}
+                                    </Alert>
+                                )}
 
-                            <p style={{ color: "red" }}>{error}</p>
+                                <Button
+                                    type="submit"
+                                    fullWidth
+                                    variant="contained"
+                                    disabled={loading}
+                                    sx={{
+                                        mt: 3,
+                                        mb: 2,
+                                        py: 1.5,
+                                        fontSize: "1rem",
+                                        fontWeight: "600",
+                                        boxShadow:
+                                            "0 4px 14px 0 rgb(56 189 248 / 39%)",
+                                        "&:hover": {
+                                            boxShadow: "none",
+                                        },
+                                    }}
+                                >
+                                    {loading ? (
+                                        <CircularProgress
+                                            size={24}
+                                            color="inherit"
+                                        />
+                                    ) : view === "login" ? (
+                                        "Sign In"
+                                    ) : (
+                                        "Register"
+                                    )}
+                                </Button>
 
-                            <Button
-                                type="button"
-                                fullWidth
-                                variant="contained"
-                                sx={{ mt: 3, mb: 2 }}
-                                onClick={handleAuth}
-                            >
-                                {formState === 0 ? "Login " : "Register"}
-                            </Button>
+                                <Grid container>
+                                    <Grid item xs>
+                                        <Link
+                                            href="#"
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Forgot password?
+                                        </Link>
+                                    </Grid>
+                                </Grid>
+                                <Copyright sx={{ mt: 5 }} />
+                            </Box>
                         </Box>
-                    </Box>
+                    </GlassPaper>
                 </Grid>
             </Grid>
 
-            <Snackbar open={open} autoHideDuration={4000} message={message} />
+            {/* Snackbar for success messages */}
+            <Snackbar
+                open={openSnackbar}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}
+                message={message}
+            />
         </ThemeProvider>
     );
 }

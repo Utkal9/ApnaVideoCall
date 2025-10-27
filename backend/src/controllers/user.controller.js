@@ -1,9 +1,10 @@
 import httpStatus from "http-status";
 import { User } from "../models/user.model.js";
 import bcrypt, { hash } from "bcrypt";
-
 import crypto from "crypto";
 import { Meeting } from "../models/meeting.model.js";
+
+// login is already perfect. It correctly overwrites the token.
 const login = async (req, res) => {
     const { username, password } = req.body;
 
@@ -37,6 +38,7 @@ const login = async (req, res) => {
     }
 };
 
+// register is also fine.
 const register = async (req, res) => {
     const { name, username, password } = req.body;
 
@@ -64,26 +66,27 @@ const register = async (req, res) => {
     }
 };
 
+// --- UPDATED getUserHistory ---
 const getUserHistory = async (req, res) => {
-    const { token } = req.query;
-
     try {
-        const user = await User.findOne({ token: token });
-        const meetings = await Meeting.find({ user_id: user.username });
+        // 1. The token is GONE.
+        // 2. We get 'req.user' directly from the authMiddleware.
+        const meetings = await Meeting.find({ user_id: req.user.username });
         res.json(meetings);
     } catch (e) {
         res.json({ message: `Something went wrong ${e}` });
     }
 };
 
+// --- UPDATED addToHistory ---
 const addToHistory = async (req, res) => {
-    const { token, meeting_code } = req.body;
+    // 1. The token is GONE from the body.
+    const { meeting_code } = req.body;
 
     try {
-        const user = await User.findOne({ token: token });
-
+        // 2. We get 'req.user' directly from the authMiddleware.
         const newMeeting = new Meeting({
-            user_id: user.username,
+            user_id: req.user.username,
             meetingCode: meeting_code,
         });
 
