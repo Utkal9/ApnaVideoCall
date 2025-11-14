@@ -312,6 +312,13 @@ export default function VideoMeetComponent() {
                 }
             }
         });
+
+        // --- NEW LISTENER FOR ROOM FULL ---
+        socketRef.current.on("room-full", () => {
+            alert("This 1-on-1 call is already in progress.");
+            window.location.href = "/"; // Redirect to home
+        });
+        // --- END NEW LISTENER ---
     };
 
     // ... (gotMessageFromServer function is unchanged)
