@@ -573,7 +573,6 @@ export default function VideoMeetComponent() {
         }
     };
 
-    // ... (handleEndCall function is unchanged)
     const handleEndCall = () => {
         try {
             if (window.localStream) {
@@ -590,7 +589,24 @@ export default function VideoMeetComponent() {
                 socketRef.current.disconnect();
             } catch (e) {}
         }
-        window.location.href = "/"; // Redirect to home
+
+        // --- NEW DYNAMIC REDIRECT LOGIC ---
+        try {
+            // 1. Read the URL's query parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectUrl = urlParams.get("redirect_url");
+
+            if (redirectUrl) {
+                // 2. If 'redirect_url' exists (came from social media)
+                window.location.href = redirectUrl;
+            } else {
+                // 3. If not (opened directly), go to home
+                window.location.href = "/";
+            }
+        } catch (e) {
+            // 4. Fallback in case of any error
+            window.location.href = "/";
+        }
     };
 
     // 8. --- UPDATED CONNECT FUNCTION ---
